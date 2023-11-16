@@ -71,12 +71,18 @@ def find_green_cross(gray: np.array):
     return center_row, center_col
 
 
-def return_binary_mask(png_path):
+def return_mask_handle(png_path, size_mm=(250, 250)):
     img = cv2.imread(png_path, cv2.COLOR_BGR2GRAY)
     boundaries = find_rectangle_boundary(np.array(img))
     numpy_image = np.array(img)
-    inner_square = numpy_image[boundaries[0][0]+3:boundaries[0][-1]-3, boundaries[1][0]+3:boundaries[1][-1]-3]
-    green_center = find_green_cross(np.array(img))
+    row_start = boundaries[0][0]
+    row_stop = boundaries[0][-1]
+    col_start = boundaries[1][0]
+    col_stop = boundaries[1][-1]
+    pad = 5
+    inner_square = numpy_image[row_start+pad:row_stop-pad, col_start+pad:col_stop-pad]
+    out_mask = np.zeros((row_stop-row_start, col_stop-col_start))
+    # green_center = find_green_cross(np.array(img))
     invert_blue = 255 - inner_square[..., 0]
     invert_blue[invert_blue <= np.median(invert_blue)] = 0
     invert_green = 255 - inner_square[..., 1]
@@ -88,11 +94,15 @@ def return_binary_mask(png_path):
     summed[summed < 255] = 0
     contours = np.where(summed == 255)
     inner_shape = inner_square.shape
-    out_mask = poly2mask(contours[0], contours[1], (inner_shape[0], inner_shape[1]))
-    return out_mask
+    binary_mask = poly2mask(contours[0], contours[1], (inner_shape[0], inner_shape[1]))
+    out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
+    out_mask = np.flipud(out_mask)
+    mask_handle = sitk.GetImageFromArray(out_mask.astype('int'))
+    mask_handle.SetSpacing((out_mask.shape[0]/size_mm[0], out_mask.shape[1]/size_mm[1]))
+    return mask_handle
 
 
-def create_rt_mask(path, mask: np.array, size_mm=(250, 250)):
+def create_rt_mask(path, mask_handle: sitk.Image):
     reader = DicomReaderWriter()
     reader.set_contour_names_and_associations(contour_names=['t'])
     reader.down_folder(path)
@@ -100,10 +110,6 @@ def create_rt_mask(path, mask: np.array, size_mm=(250, 250)):
     input_shape = reader.ArrayDicom.shape
     out_mask = np.zeros(input_shape + (2,)).astype('int')
     dicom_spacing = reader.annotation_handle.GetSpacing()
-
-    mask = np.flipud(mask)
-    mask_handle = sitk.GetImageFromArray(mask.astype('int'))
-    mask_handle.SetSpacing((mask.shape[0]/size_mm[0], mask.shape[1]/size_mm[1]))
 
     resampler = ImageResampler()
     desired_dimensions = (dicom_spacing[1], dicom_spacing[2])
@@ -123,10 +129,8 @@ def main():
     path = r'Data'
     # create_mask(path)
     # create_png(path)
-    mask = return_binary_mask(os.path.join(path, "Report.png"))
-    create_rt_mask(path, mask)
-
-
+    mask_handle = return_mask_handle(os.path.join(path, "Report.png"))
+    create_rt_mask(path, mask_handle)
     x = 1
 
 
