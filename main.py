@@ -2,6 +2,7 @@ import os
 from DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
 # from fitz import *
+from NiftiResampler.ResampleTools import ImageResampler, sitk
 from scipy.signal import convolve2d
 import cv2
 import numpy as np
@@ -91,12 +92,39 @@ def return_binary_mask(png_path):
     return out_mask
 
 
+def create_rt_mask(path, mask: np.array, size_mm=(250, 250)):
+    reader = DicomReaderWriter()
+    reader.set_contour_names_and_associations(contour_names=['t'])
+    reader.down_folder(path)
+    reader.get_images_and_mask()
+    input_shape = reader.ArrayDicom.shape
+    out_mask = np.zeros(input_shape + (2,)).astype('int')
+    dicom_spacing = reader.annotation_handle.GetSpacing()
+
+    mask = np.flipud(mask)
+    mask_handle = sitk.GetImageFromArray(mask.astype('int'))
+    mask_handle.SetSpacing((mask.shape[0]/size_mm[0], mask.shape[1]/size_mm[1]))
+
+    resampler = ImageResampler()
+    desired_dimensions = (dicom_spacing[1], dicom_spacing[2])
+    resampled = resampler.resample_image(input_image_handle=mask_handle, output_spacing=desired_dimensions,
+                                         interpolator='Nearest')
+    resampled_array = sitk.GetArrayFromImage(resampled)
+    mask_shape = resampled_array.shape
+
+    row_start = int((input_shape[0]-mask_shape[0])/2)
+    col_start = int((input_shape[1]-mask_shape[1])/2)
+    out_mask[row_start:row_start+mask_shape[0], 1, col_start:col_start+mask_shape[1], 1] = resampled_array
+    reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
+    return
+
+
 def main():
-    path = r'\\vscifs1\physicsqadata\BMA\CutoutWork'
+    path = r'Data'
     # create_mask(path)
     # create_png(path)
-    mask = return_binary_mask("Data\Report.png")
-
+    mask = return_binary_mask(os.path.join(path, "Report.png"))
+    create_rt_mask(path, mask)
 
 
     x = 1
