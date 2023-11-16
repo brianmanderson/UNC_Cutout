@@ -1,7 +1,7 @@
 import os
 from DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
-# from fitz import *
+from fitz import *
 from NiftiResampler.ResampleTools import ImageResampler, sitk
 from scipy.signal import convolve2d
 import cv2
@@ -71,7 +71,13 @@ def find_green_cross(gray: np.array):
     return center_row, center_col
 
 
-def return_mask_handle(png_path, size_mm=(250, 250)):
+def return_binary_mask(numpy_binary_outline: np.array, out_shape):
+    contours = np.where(numpy_binary_outline == 255)
+    binary_mask = poly2mask(contours[0], contours[1], (out_shape[0], out_shape[1]))
+    return binary_mask
+
+
+def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     img = cv2.imread(png_path, cv2.COLOR_BGR2GRAY)
     boundaries = find_rectangle_boundary(np.array(img))
     numpy_image = np.array(img)
@@ -92,9 +98,8 @@ def return_mask_handle(png_path, size_mm=(250, 250)):
     summed = (red/3 + invert_blue/3 + invert_green/3).astype('uint8')
     summed[summed > 90] = 255
     summed[summed < 255] = 0
-    contours = np.where(summed == 255)
     inner_shape = inner_square.shape
-    binary_mask = poly2mask(contours[0], contours[1], (inner_shape[0], inner_shape[1]))
+    binary_mask = return_binary_mask(summed, inner_shape)
     out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
     out_mask = np.flipud(out_mask)
     mask_handle = sitk.GetImageFromArray(out_mask.astype('int'))
@@ -102,14 +107,33 @@ def return_mask_handle(png_path, size_mm=(250, 250)):
     return mask_handle
 
 
+def return_mask_handle_from_scanner(jpeg_path):
+    img = cv2.imread(jpeg_path, cv2.COLOR_BGR2GRAY)
+    inner_square = np.array(img)
+    # green_center = find_green_cross(np.array(img))
+    invert_blue = 255 - inner_square[..., 0]
+    invert_blue[invert_blue <= np.median(invert_blue)] = 0
+    invert_green = 255 - inner_square[..., 1]
+    invert_green[invert_green <= np.median(invert_green)] = 0
+    invert_red = 255 - inner_square[..., 2]
+    invert_red[invert_red <= np.median(invert_red)] = 0
+    summed = (invert_red/3 + invert_blue/3 + invert_green/3).astype('uint8')
+    summed[summed > 90] = 255
+    summed[summed < 255] = 0
+    inner_shape = inner_square.shape[:2]
+    binary_mask = np.flipud(return_binary_mask(summed, inner_shape))
+    mask_handle = sitk.GetImageFromArray(binary_mask.astype('int'))
+    mask_handle.SetSpacing((0.35728, 0.35728))  # 72 dpi
+    return mask_handle
+
+
 def create_rt_mask(path, mask_handle: sitk.Image):
     reader = DicomReaderWriter()
-    reader.set_contour_names_and_associations(contour_names=['t'])
-    reader.down_folder(path)
-    reader.get_images_and_mask()
+    reader.down_folder(os.path.join(path, "CT"))
+    reader.get_images()
     input_shape = reader.ArrayDicom.shape
     out_mask = np.zeros(input_shape + (2,)).astype('int')
-    dicom_spacing = reader.annotation_handle.GetSpacing()
+    dicom_spacing = reader.dicom_handle.GetSpacing()
 
     resampler = ImageResampler()
     desired_dimensions = (dicom_spacing[1], dicom_spacing[2])
@@ -120,16 +144,17 @@ def create_rt_mask(path, mask_handle: sitk.Image):
 
     row_start = int((input_shape[0]-mask_shape[0])/2)
     col_start = int((input_shape[1]-mask_shape[1])/2)
-    out_mask[row_start:row_start+mask_shape[0], 1, col_start:col_start+mask_shape[1], 1] = resampled_array
+    out_mask[row_start:row_start + mask_shape[0], 1, col_start:col_start + mask_shape[1], 1] = resampled_array
     reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
     return
 
 
 def main():
     path = r'Data'
-    # create_mask(path)
     # create_png(path)
-    mask_handle = return_mask_handle(os.path.join(path, "Report.png"))
+    # create_mask(path)
+    # mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
+    mask_handle = return_mask_handle_from_scanner(os.path.join(path, "cutout.jpg"))
     create_rt_mask(path, mask_handle)
     x = 1
 
