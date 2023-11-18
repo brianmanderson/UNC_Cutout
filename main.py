@@ -131,6 +131,7 @@ def create_rt_mask(path, mask_handle: sitk.Image):
     reader = DicomReaderWriter()
     reader.down_folder(os.path.join(path, "CT"))
     reader.get_images()
+
     input_shape = reader.ArrayDicom.shape
     out_mask = np.zeros(input_shape + (2,)).astype('int')
     dicom_spacing = reader.dicom_handle.GetSpacing()
@@ -149,6 +150,51 @@ def create_rt_mask(path, mask_handle: sitk.Image):
     return
 
 
+def temp_run():
+    path = r'Data'
+
+    reader = DicomReaderWriter()
+    reader.down_folder(os.path.join(path, "CT"))
+    reader.get_images()
+    sitk.WriteImage(reader.dicom_handle, "Data/Dicom_Handle.mhd")
+
+    ct_path = "Data/CT.mhd"
+    resampler = ImageResampler()
+    if not os.path.exists(ct_path):
+        desired_dimensions = (0.5, 0.5, 5.0)
+        resampled = resampler.resample_image(input_image_handle=reader.dicom_handle, output_spacing=desired_dimensions,
+                                             interpolator='Linear')
+        sitk.WriteImage(resampled, "Data/CT.mhd")
+    ct_resampled = sitk.ReadImage(ct_path)
+    ct_numpy = sitk.GetArrayFromImage(ct_resampled)
+    out_mask = np.zeros(ct_numpy.shape)
+    r, c = 10, 15
+    out_mask[0, r:c, r] = 1
+    out_mask[0, r:c, c] = 1
+    out_mask[0, c, r:c+1] = 1
+    out_mask[0, r, r:c] = 1
+    points = np.where(out_mask > 0)
+    indexes = np.array(points[::-1]).transpose()
+    image: sitk.Image
+    image = reader.dicom_handle
+    physical = np.asarray([image.TransformContinuousIndexToPhysicalPoint(zz.astype('float')) for zz in indexes])
+    out_handle = sitk.GetImageFromArray(out_mask)
+    out_handle.SetSpacing(image.GetSpacing())
+    out_handle.SetOrigin(image.GetOrigin())
+    out_handle.SetDirection(image.GetDirection())
+    sitk.WriteImage(out_handle, "Data/Handle.mhd")
+
+    out_mask = np.zeros(reader.ArrayDicom.shape + (2,))
+    out_mask[1, r:c, r] = 1
+    out_mask[1, r:c, c] = 1
+    out_mask[1, c, r:c+1] = 1
+    out_mask[1, r, r:c] = 1
+
+    reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
+    x = 1
+
+
+
 def main():
     path = r'Data'
     # create_png(path)
@@ -160,4 +206,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    temp_run()
