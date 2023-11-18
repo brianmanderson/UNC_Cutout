@@ -167,12 +167,15 @@ def temp_run():
         sitk.WriteImage(resampled, "Data/CT.mhd")
     ct_resampled = sitk.ReadImage(ct_path)
     ct_numpy = sitk.GetArrayFromImage(ct_resampled)
-    out_mask = np.zeros(ct_numpy.shape)
-    r, c = 10, 15
-    out_mask[0, r:c, r] = 1
-    out_mask[0, r:c, c] = 1
-    out_mask[0, c, r:c+1] = 1
-    out_mask[0, r, r:c] = 1
+    out_mask = np.zeros(ct_numpy.shape, dtype='int')
+    r, c = 100, 150
+    out_mask[1:5, r:c, r] = 1
+    out_mask[1:5, r:c, c] = 1
+    out_mask[1:5, c, r:c+1] = 1
+    out_mask[1:5, r, r:c] = 1
+    out_mask[1:5, r:c, r:c] = 1
+    out_mask[2:4, r+10:c-10, r+10:c-10] = 0
+    out_mask[2:4, r+14:c-14, r+14:c-14] = 1
     points = np.where(out_mask > 0)
     indexes = np.array(points[::-1]).transpose()
     image: sitk.Image
@@ -182,8 +185,8 @@ def temp_run():
     out_handle.SetSpacing(image.GetSpacing())
     out_handle.SetOrigin(image.GetOrigin())
     out_handle.SetDirection(image.GetDirection())
+    boundary = sitk.BinaryContour(out_handle)
     sitk.WriteImage(out_handle, "Data/Handle.mhd")
-
     out_mask = np.zeros(reader.ArrayDicom.shape + (2,))
     out_mask[1, r:c, r] = 1
     out_mask[1, r:c, c] = 1
