@@ -1,7 +1,7 @@
 import os
+import pydicom
 from Dicom_RT_and_Images_to_Mask.src.DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
-from fitz import *
 from NiftiResampler.ResampleTools import ImageResampler, sitk
 from scipy.signal import convolve2d
 import cv2
@@ -145,7 +145,7 @@ def create_rt_mask(path, mask_handle: sitk.Image):
     row_start = int((input_shape[0]-mask_shape[0])/2)
     col_start = int((input_shape[1]-mask_shape[1])/2)
     out_mask[row_start:row_start + mask_shape[0], 1, col_start:col_start + mask_shape[1], 1] = resampled_array
-    reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
+    reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"], ROI_Types=["PTV"])
     return
 
 
@@ -153,8 +153,8 @@ def main():
     path = r'Data'
     # create_png(path)
     # create_mask(path)
-    # mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
-    mask_handle = return_mask_handle_from_scanner(os.path.join(path, "cutout.jpg"))
+    mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
+    # mask_handle = return_mask_handle_from_scanner(os.path.join(path, "cutout.jpg"))
     create_rt_mask(path, mask_handle)
     x = 1
 
