@@ -1,6 +1,5 @@
 import os
-from DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
-from Dicom_RT_and_Images_to_Mask.s
+from Dicom_RT_and_Images_to_Mask.src.DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
 from fitz import *
 from NiftiResampler.ResampleTools import ImageResampler, sitk
