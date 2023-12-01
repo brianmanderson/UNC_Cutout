@@ -130,17 +130,9 @@ def return_mask_handle_from_scanner(jpeg_path):
     return mask_handle
 
 
-<<<<<<< HEAD
-def create_rt_mask(path, mask_handle: sitk.Image):
-    reader = DicomReaderWriter()
-    reader.down_folder(os.path.join(path, "CT"))
-    reader.get_images()
-
-=======
 def create_rt_mask(reader: DicomReaderWriter, out_path, mask_handle: sitk.Image):
     if not os.path.exists(out_path):
         os.makedirs(out_path)
->>>>>>> b1d89e313b276a9de23bb8f05a1f540548c99c72
     input_shape = reader.ArrayDicom.shape
     out_mask = np.zeros(input_shape + (2,)).astype('int')
     dicom_spacing = reader.dicom_handle.GetSpacing()
