@@ -227,6 +227,7 @@ def main():
                 if not file_name.lower().endswith("jpg"):
                     continue
                 file = os.path.join(monitored_path, folder, file_name)
+                print(f"Running off {file}")
                 time.sleep(3)  # Sleep for 3 seconds to make sure its uploaded
                 mask_handle = return_mask_handle_from_scanner(file, folder)
                 create_rt_mask(reader, monitored_path, mask_handle)
