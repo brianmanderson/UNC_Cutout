@@ -218,7 +218,10 @@ def main():
     # mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
     monitored_path = r'\\vscifs1\physicsQAdata\UNC_ElectronCutout'
     reader = DicomReaderWriter()
-    reader.down_folder(r'\\vscifs1\physicsQAdata\BMA\CutoutWork\Exam')
+    if os.path.exists(r'.\Data\Exam'):
+        reader.down_folder(r'.\Data\Exam')
+    else:
+        reader.down_folder(r'\\vscifs1\physicsQAdata\BMA\CutoutWork\Exam')
     reader.get_images()
     while True:
         time.sleep(1)  # Sleep for 3 seconds between waiting
