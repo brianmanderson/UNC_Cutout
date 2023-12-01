@@ -136,6 +136,11 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
     summed[summed < 255] = 0
     inner_shape = inner_square.shape[:2]
     binary_mask = np.flipud(return_binary_mask(summed, inner_shape))
+
+    img_out = np.zeros(binary_mask.shape + (3,), dtype="uint8")
+    img_out[binary_mask > 0] = 255
+    new_path = os.path.dirname(os.path.dirname(jpeg_path))
+    cv2.imwrite(os.path.join(new_path, "mask.jpg"), img_out)
     mask_handle = sitk.GetImageFromArray(binary_mask.astype('int'))
     mask_handle.SetSpacing((0.35728, 0.35728))  # 72 dpi
     return mask_handle
@@ -229,4 +234,4 @@ def main():
 
 
 if __name__ == '__main__':
-    temp_run()
+    main()
