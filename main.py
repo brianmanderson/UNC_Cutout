@@ -132,10 +132,14 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
         red = 255 - red
     red[red <= np.median(red)] = 0
     summed = (red/3 + blue/3 + green/3).astype('uint8')
-    summed[summed > 90] = 255
+    summed[summed > 50] = 255
     summed[summed < 255] = 0
-    inner_shape = inner_square.shape[:2]
-    binary_mask = np.flipud(return_binary_mask(summed, inner_shape))
+    summed_handle = sitk.GetImageFromArray(summed.astype('int'))
+
+    filled_in_handle = sitk.BinaryFillhole(summed_handle, fullyConnected=True, foregroundValue=255)
+    connected_component_filter = sitk.ConnectedComponentImageFilter()
+    labeled_truth = connected_component_filter.Execute(filled_in_handle)
+    binary_mask = np.flipud(sitk.GetArrayFromImage(labeled_truth) == 1)
 
     img_out = np.zeros(binary_mask.shape + (3,), dtype="uint8")
     img_out[binary_mask > 0] = 255
@@ -224,7 +228,7 @@ def main():
         reader.down_folder(r'\\vscifs1\physicsQAdata\BMA\CutoutWork\Exam')
     reader.get_images()
     while True:
-        time.sleep(1)  # Sleep for 3 seconds between waiting
+        time.sleep(3)  # Sleep for 3 seconds between waiting
         for folder in ["Red", "Green", "Blue", "Black"]:
             for file_name in os.listdir(os.path.join(monitored_path, folder)):
                 if not file_name.lower().endswith("jpg"):
@@ -235,7 +239,7 @@ def main():
                 mask_handle = return_mask_handle_from_scanner(file, folder)
                 create_rt_mask(reader, monitored_path, mask_handle)
                 os.remove(file)
-        break
+
 
 if __name__ == '__main__':
     main()
