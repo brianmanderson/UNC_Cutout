@@ -171,7 +171,7 @@ def temp_run():
     path = r'Data'
 
     reader = DicomReaderWriter()
-    reader.down_folder(os.path.join(path, "CT"))
+    reader.down_folder(os.path.join(path, "Exam"))
     reader.get_images()
     sitk.WriteImage(reader.dicom_handle, "Data/Dicom_Handle.mhd")
 
@@ -221,7 +221,7 @@ def main():
     reader.down_folder(r'\\vscifs1\physicsQAdata\BMA\CutoutWork\Exam')
     reader.get_images()
     while True:
-        time.sleep(3)  # Sleep for 3 seconds between waiting
+        time.sleep(1)  # Sleep for 3 seconds between waiting
         for folder in ["Red", "Green", "Blue", "Black"]:
             for file_name in os.listdir(os.path.join(monitored_path, folder)):
                 if not file_name.lower().endswith("jpg"):
@@ -232,7 +232,7 @@ def main():
                 mask_handle = return_mask_handle_from_scanner(file, folder)
                 create_rt_mask(reader, monitored_path, mask_handle)
                 os.remove(file)
-
+        break
 
 if __name__ == '__main__':
     main()
