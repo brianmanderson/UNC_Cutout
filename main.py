@@ -1,7 +1,10 @@
+import glob
 import os
-from DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
+import time
+
+import pydicom
+from Dicom_RT_and_Images_to_Mask.src.DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
-from fitz import *
 from NiftiResampler.ResampleTools import ImageResampler, sitk
 from scipy.signal import convolve2d
 import cv2
@@ -127,11 +130,17 @@ def return_mask_handle_from_scanner(jpeg_path):
     return mask_handle
 
 
+<<<<<<< HEAD
 def create_rt_mask(path, mask_handle: sitk.Image):
     reader = DicomReaderWriter()
     reader.down_folder(os.path.join(path, "CT"))
     reader.get_images()
 
+=======
+def create_rt_mask(reader: DicomReaderWriter, out_path, mask_handle: sitk.Image):
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+>>>>>>> b1d89e313b276a9de23bb8f05a1f540548c99c72
     input_shape = reader.ArrayDicom.shape
     out_mask = np.zeros(input_shape + (2,)).astype('int')
     dicom_spacing = reader.dicom_handle.GetSpacing()
@@ -146,7 +155,7 @@ def create_rt_mask(path, mask_handle: sitk.Image):
     row_start = int((input_shape[0]-mask_shape[0])/2)
     col_start = int((input_shape[1]-mask_shape[1])/2)
     out_mask[row_start:row_start + mask_shape[0], 1, col_start:col_start + mask_shape[1], 1] = resampled_array
-    reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
+    reader.prediction_array_to_RT(out_mask, output_dir=out_path, ROI_Names=["New"], ROI_Types=["PTV"])
     return
 
 
@@ -199,13 +208,20 @@ def temp_run():
 
 
 def main():
-    path = r'Data'
     # create_png(path)
     # create_mask(path)
     # mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
-    mask_handle = return_mask_handle_from_scanner(os.path.join(path, "cutout.jpg"))
-    create_rt_mask(path, mask_handle)
-    x = 1
+    monitored_path = r'\\vscifs1\physicsQAdata\UNC_ElectronCutout'
+    reader = DicomReaderWriter()
+    reader.down_folder(r'\\vscifs1\physicsQAdata\BMA\CutoutWork\Exam')
+    reader.get_images()
+    while True:
+        time.sleep(3)  # Sleep for 3 seconds between waiting
+        for file in glob.glob(os.path.join(monitored_path, "*jpg")):
+            time.sleep(3)  # Sleep for 3 seconds to make sure its uploaded
+            mask_handle = return_mask_handle_from_scanner(file)
+            create_rt_mask(reader, monitored_path, mask_handle)
+            os.remove(file)
 
 
 if __name__ == '__main__':
