@@ -110,17 +110,28 @@ def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     return mask_handle
 
 
-def return_mask_handle_from_scanner(jpeg_path):
+def return_mask_handle_from_scanner(jpeg_path, folder: str):
+    """
+    :param jpeg_path:
+    :param folder: name of the color, 'Red', 'Green', 'Blue', 'Black'
+    :return:
+    """
     img = cv2.imread(jpeg_path, cv2.COLOR_BGR2GRAY)
     inner_square = np.array(img)
     # green_center = find_green_cross(np.array(img))
-    invert_blue = 255 - inner_square[..., 0]
-    invert_blue[invert_blue <= np.median(invert_blue)] = 0
-    invert_green = 255 - inner_square[..., 1]
-    invert_green[invert_green <= np.median(invert_green)] = 0
-    invert_red = 255 - inner_square[..., 2]
-    invert_red[invert_red <= np.median(invert_red)] = 0
-    summed = (invert_red/3 + invert_blue/3 + invert_green/3).astype('uint8')
+    blue = inner_square[..., 0]
+    green = inner_square[..., 1]
+    red = inner_square[..., 2]
+    if folder != "Blue":
+        blue = 255 - blue
+    blue[blue <= np.median(blue)] = 0
+    if folder != "Green":
+        green = 255 - green
+    green[green <= np.median(green)] = 0
+    if folder != "Red":
+        red = 255 - red
+    red[red <= np.median(red)] = 0
+    summed = (red/3 + blue/3 + green/3).astype('uint8')
     summed[summed > 90] = 255
     summed[summed < 255] = 0
     inner_shape = inner_square.shape[:2]
@@ -193,10 +204,7 @@ def temp_run():
     out_mask[1, r:c, c] = 1
     out_mask[1, c, r:c+1] = 1
     out_mask[1, r, r:c] = 1
-
     reader.prediction_array_to_RT(out_mask, output_dir=path, ROI_Names=["New"])
-    x = 1
-
 
 
 def main():
@@ -209,11 +217,15 @@ def main():
     reader.get_images()
     while True:
         time.sleep(3)  # Sleep for 3 seconds between waiting
-        for file in glob.glob(os.path.join(monitored_path, "*jpg")):
-            time.sleep(3)  # Sleep for 3 seconds to make sure its uploaded
-            mask_handle = return_mask_handle_from_scanner(file)
-            create_rt_mask(reader, monitored_path, mask_handle)
-            os.remove(file)
+        for folder in ["Red", "Green", "Blue", "Black"]:
+            for file_name in os.listdir(os.path.join(monitored_path, folder)):
+                if not file_name.lower().endswith("jpg"):
+                    continue
+                file = os.path.join(monitored_path, folder, file_name)
+                time.sleep(3)  # Sleep for 3 seconds to make sure its uploaded
+                mask_handle = return_mask_handle_from_scanner(file, folder)
+                create_rt_mask(reader, monitored_path, mask_handle)
+                os.remove(file)
 
 
 if __name__ == '__main__':
