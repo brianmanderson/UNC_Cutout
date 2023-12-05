@@ -40,13 +40,11 @@ def create_ground_truth_mask(path):
     return
 
 
-def create_png(path):
-    pdffile = os.path.join(path, "ReportImage.pdf")
-    doc = fitz.open(pdffile)
+def create_png(file_path):
+    doc = fitz.open(file_path)
     page = doc.load_page(0)  # number of page
     pix = page.get_pixmap()
-    output = "Data\Report.png"
-    pix.save(output)
+    pix.save(file_path.replace(".pdf", ".png"))
     doc.close()
     return
 
@@ -219,8 +217,9 @@ def temp_run():
 def main():
     # create_png(path)
     # create_mask(path)
-    # mask_handle = return_mask_handle_from_dot_report(os.path.join(path, "Report.png"))
+    #
     monitored_path = r'\\vscifs1\physicsQAdata\UNC_ElectronCutout'
+    dot_decimal_path = os.path.join(monitored_path, "FromDotDecimal")
     reader = DicomReaderWriter()
     if os.path.exists(r'.\Data\Exam'):
         reader.down_folder(r'.\Data\Exam')
@@ -237,6 +236,20 @@ def main():
                 print(f"Running off {file}")
                 time.sleep(3)  # Sleep for 3 seconds to make sure its uploaded
                 mask_handle = return_mask_handle_from_scanner(file, folder)
+                create_rt_mask(reader, monitored_path, mask_handle)
+                os.remove(file)
+        for folder in os.listdir(dot_decimal_path):
+            applicator_size = int(folder.split('x')[0])
+            for file_name in os.listdir(os.path.join(dot_decimal_path, folder)):
+                file = os.path.join(dot_decimal_path, folder, file_name)
+                if file_name.lower().endswith("pdf"):
+                    create_png(file)
+                    os.remove(file)
+                    continue
+                if not file_name.lower().endswith("png"):
+                    continue
+                mask_handle = return_mask_handle_from_dot_report(file,
+                                                                 size_mm=(applicator_size*10, applicator_size*10))
                 create_rt_mask(reader, monitored_path, mask_handle)
                 os.remove(file)
 
