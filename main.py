@@ -78,45 +78,70 @@ def return_binary_mask(numpy_binary_outline: np.array, out_shape):
     return binary_mask
 
 
+def return_largest_label(stats: sitk.LabelIntensityStatisticsImageFilter, maximum_size: np.inf):
+    largest_size = 0
+    out_label = 1
+    for l in stats.GetLabels():
+        physical_size = stats.GetPhysicalSize(l)
+        if physical_size > largest_size:
+            if physical_size < maximum_size:
+                out_label = l
+                largest_size = physical_size
+    return out_label, largest_size
+
+
 def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     img = cv2.imread(png_path, cv2.COLOR_BGR2GRAY)
-    boundaries = find_rectangle_boundary(np.array(img))
-    numpy_image = np.array(img)
-    row_start = boundaries[0][0]
-    row_stop = boundaries[0][-1]
-    col_start = boundaries[1][0]
-    col_stop = boundaries[1][-1]
+    numpy_img = np.array(img)
+    white = np.min(numpy_img, axis=-1)
+    numpy_img[white > 150] = 0
+    red = numpy_img[..., 2]
+    red[red < 50] = 0
+    red[red > 0] = 255
+    labeled_truth, stats = return_stats_labels(red)
+    """
+    First lets find the outside boundary red box. Then we will focus on the cutout
+    """
+    largest_label, largest_size = return_largest_label(stats, np.inf)
+    boundary_box = stats.GetBoundingBox(largest_label)
+    out_mask = np.zeros((boundary_box[-1], boundary_box[2]))
+    row_start = boundary_box[1]
+    row_stop = row_start + boundary_box[-1]
+    col_start = boundary_box[0]
+    col_stop = col_start + boundary_box[2]
+    """
+    Now, find the binary mask of the cutout
+    """
     pad = 5
-    inner_square = numpy_image[row_start+pad:row_stop-pad, col_start+pad:col_stop-pad]
-    out_mask = np.zeros((row_stop-row_start, col_stop-col_start))
-    # green_center = find_green_cross(np.array(img))
-    invert_blue = 255 - inner_square[..., 0]
-    invert_blue[invert_blue <= np.median(invert_blue)] = 0
-    invert_green = 255 - inner_square[..., 1]
-    invert_green[invert_green <= np.median(invert_green)] = 0
-    red = inner_square[..., 2]
-    red[red <= np.median(red)] = 0
-    summed = (red/3 + invert_blue/3 + invert_green/3).astype('uint8')
-    summed[summed > 90] = 255
-    summed[summed < 255] = 0
-    labeled_truth = return_largest_sitk_handle(summed)
-    binary_mask = np.flipud(sitk.GetArrayFromImage(labeled_truth) == 1)
-    out_path = os.path.dirname(os.path.dirname(os.path.dirname(png_path)))  # Bump up two levels
-    write_binary_mask_image(out_path, binary_mask)
+    inner_square = red[row_start + pad:row_stop - pad, col_start + pad:col_stop - pad]
+    labeled_truth, stats = return_stats_labels(inner_square)
+    cutout_label, _ = return_largest_label(stats, largest_size)
+    binary_mask = sitk.GetArrayFromImage(labeled_truth) == cutout_label
     out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
     out_mask = np.flipud(out_mask)
+    out_path = os.path.dirname(os.path.dirname(os.path.dirname(png_path)))  # Bump up two levels
+    write_binary_mask_image(out_path, out_mask)
 
     mask_handle = sitk.GetImageFromArray(out_mask.astype('int'))
     mask_handle.SetSpacing((size_mm[0]/out_mask.shape[0], size_mm[1]/out_mask.shape[1]))
     return mask_handle
 
 
-def return_largest_sitk_handle(numpy_array: np.array):
+def return_stats_labels(numpy_array: np.array):
     summed_handle = sitk.GetImageFromArray(numpy_array.astype('int'))
     filled_in_handle = sitk.BinaryFillhole(summed_handle, fullyConnected=True, foregroundValue=255)
+    cc = sitk.ConnectedComponent(filled_in_handle > 0)
     connected_component_filter = sitk.ConnectedComponentImageFilter()
     labeled_truth = connected_component_filter.Execute(filled_in_handle)
-    return labeled_truth
+    stats = sitk.LabelIntensityStatisticsImageFilter()
+    stats.Execute(cc, labeled_truth)
+    return labeled_truth, stats
+
+
+def return_largest_sitk_handle(numpy_array: np.array):
+    labeled_truth, stats = return_stats_labels(numpy_array)
+    l_label, l_size = return_largest_label(stats, np.inf)
+    return labeled_truth == l_label
 
 
 def write_binary_mask_image(out_path, binary_mask: np.array):
