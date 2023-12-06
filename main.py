@@ -1,7 +1,6 @@
 import glob
 import os
 import time
-
 import pydicom
 from Dicom_RT_and_Images_to_Mask.src.DicomRTTool.ReaderWriter import DicomReaderWriter, sitk
 from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
@@ -9,6 +8,7 @@ from NiftiResampler.ResampleTools import ImageResampler, sitk
 from scipy.signal import convolve2d
 import cv2
 import numpy as np
+import fitz
 
 
 def poly2mask(vertex_row_coords: np.array, vertex_col_coords: np.array,
@@ -99,13 +99,31 @@ def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     summed = (red/3 + invert_blue/3 + invert_green/3).astype('uint8')
     summed[summed > 90] = 255
     summed[summed < 255] = 0
-    inner_shape = inner_square.shape
-    binary_mask = return_binary_mask(summed, inner_shape)
+    labeled_truth = return_largest_sitk_handle(summed)
+    binary_mask = np.flipud(sitk.GetArrayFromImage(labeled_truth) == 1)
+    out_path = os.path.dirname(os.path.dirname(os.path.dirname(png_path)))  # Bump up two levels
+    write_binary_mask_image(out_path, binary_mask)
     out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
     out_mask = np.flipud(out_mask)
+
     mask_handle = sitk.GetImageFromArray(out_mask.astype('int'))
-    mask_handle.SetSpacing((out_mask.shape[0]/size_mm[0], out_mask.shape[1]/size_mm[1]))
+    mask_handle.SetSpacing((size_mm[0]/out_mask.shape[0], size_mm[1]/out_mask.shape[1]))
     return mask_handle
+
+
+def return_largest_sitk_handle(numpy_array: np.array):
+    summed_handle = sitk.GetImageFromArray(numpy_array.astype('int'))
+    filled_in_handle = sitk.BinaryFillhole(summed_handle, fullyConnected=True, foregroundValue=255)
+    connected_component_filter = sitk.ConnectedComponentImageFilter()
+    labeled_truth = connected_component_filter.Execute(filled_in_handle)
+    return labeled_truth
+
+
+def write_binary_mask_image(out_path, binary_mask: np.array):
+    img_out = np.zeros(binary_mask.shape + (3,), dtype="uint8")
+    img_out[binary_mask > 0] = 255
+    cv2.imwrite(os.path.join(out_path, "mask.jpg"), img_out)
+    return None
 
 
 def return_mask_handle_from_scanner(jpeg_path, folder: str):
@@ -132,17 +150,10 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
     summed = (red/3 + blue/3 + green/3).astype('uint8')
     summed[summed > 50] = 255
     summed[summed < 255] = 0
-    summed_handle = sitk.GetImageFromArray(summed.astype('int'))
-
-    filled_in_handle = sitk.BinaryFillhole(summed_handle, fullyConnected=True, foregroundValue=255)
-    connected_component_filter = sitk.ConnectedComponentImageFilter()
-    labeled_truth = connected_component_filter.Execute(filled_in_handle)
+    labeled_truth = return_largest_sitk_handle(summed)
     binary_mask = np.flipud(sitk.GetArrayFromImage(labeled_truth) == 1)
-
-    img_out = np.zeros(binary_mask.shape + (3,), dtype="uint8")
-    img_out[binary_mask > 0] = 255
-    new_path = os.path.dirname(os.path.dirname(jpeg_path))
-    cv2.imwrite(os.path.join(new_path, "mask.jpg"), img_out)
+    out_path = os.path.dirname(os.path.dirname(jpeg_path))  # Bump up two levels
+    write_binary_mask_image(out_path, binary_mask)
     mask_handle = sitk.GetImageFromArray(binary_mask.astype('int'))
     mask_handle.SetSpacing((0.35728, 0.35728))  # 72 dpi
     return mask_handle
