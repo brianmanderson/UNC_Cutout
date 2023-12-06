@@ -118,7 +118,7 @@ def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     cutout_label, _ = return_largest_label(stats, largest_size)
     binary_mask = sitk.GetArrayFromImage(labeled_truth) == cutout_label
     out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
-    out_mask = np.flipud(out_mask)
+    # out_mask = np.flipud(out_mask)
     out_path = os.path.dirname(os.path.dirname(os.path.dirname(png_path)))  # Bump up two levels
     write_binary_mask_image(out_path, out_mask)
 
@@ -165,22 +165,22 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
     red = inner_square[..., 2]
     if folder != "Blue":
         blue = 255 - blue
-    blue[blue <= np.median(blue)] = 0
+    blue[blue <= np.median(blue) + 50] = 0
     if folder != "Green":
         green = 255 - green
-    green[green <= np.median(green)] = 0
+    green[green <= np.median(green) + 50] = 0
     if folder != "Red":
         red = 255 - red
-    red[red <= np.median(red)] = 0
+    red[red <= np.median(red) + 50] = 0
     summed = (red/3 + blue/3 + green/3).astype('uint8')
     summed[summed > 50] = 255
     summed[summed < 255] = 0
     labeled_truth = return_largest_sitk_handle(summed)
-    binary_mask = np.flipud(sitk.GetArrayFromImage(labeled_truth) == 1)
+    binary_mask = sitk.GetArrayFromImage(labeled_truth) == 1
     out_path = os.path.dirname(os.path.dirname(jpeg_path))  # Bump up two levels
     write_binary_mask_image(out_path, binary_mask)
     mask_handle = sitk.GetImageFromArray(binary_mask.astype('int'))
-    mask_handle.SetSpacing((0.35728, 0.35728))  # 72 dpi
+    mask_handle.SetSpacing((0.35728, 0.35728))  # 0.08467 for 300 dpi, 0.35728 for 72 dpi
     return mask_handle
 
 
