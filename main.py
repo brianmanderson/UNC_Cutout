@@ -177,6 +177,7 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
     summed[summed < 255] = 0
     labeled_truth = return_largest_sitk_handle(summed)
     binary_mask = sitk.GetArrayFromImage(labeled_truth) == 1
+    binary_mask[summed > 0] = 0 # Cutout the edge
     binary_mask = np.flipud(binary_mask)
     out_path = os.path.dirname(os.path.dirname(jpeg_path))  # Bump up two levels
     write_binary_mask_image(out_path, binary_mask)
