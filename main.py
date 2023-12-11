@@ -118,7 +118,7 @@ def return_mask_handle_from_dot_report(png_path, size_mm=(250, 250)):
     cutout_label, _ = return_largest_label(stats, largest_size)
     binary_mask = sitk.GetArrayFromImage(labeled_truth) == cutout_label
     out_mask[pad: -pad, pad:-pad] += binary_mask.astype('int')
-    # out_mask = np.flipud(out_mask)
+    out_mask = np.flipud(out_mask)
     out_path = os.path.dirname(os.path.dirname(os.path.dirname(png_path)))  # Bump up two levels
     write_binary_mask_image(out_path, out_mask)
 
@@ -177,6 +177,7 @@ def return_mask_handle_from_scanner(jpeg_path, folder: str):
     summed[summed < 255] = 0
     labeled_truth = return_largest_sitk_handle(summed)
     binary_mask = sitk.GetArrayFromImage(labeled_truth) == 1
+    binary_mask = np.flipud(binary_mask)
     out_path = os.path.dirname(os.path.dirname(jpeg_path))  # Bump up two levels
     write_binary_mask_image(out_path, binary_mask)
     mask_handle = sitk.GetImageFromArray(binary_mask.astype('int'))
@@ -274,20 +275,20 @@ def main():
                 mask_handle = return_mask_handle_from_scanner(file, folder)
                 create_rt_mask(reader, monitored_path, mask_handle)
                 os.remove(file)
-        for folder in os.listdir(dot_decimal_path):
-            applicator_size = int(folder.split('x')[0])
-            for file_name in os.listdir(os.path.join(dot_decimal_path, folder)):
-                file = os.path.join(dot_decimal_path, folder, file_name)
-                if file_name.lower().endswith("pdf"):
-                    create_png(file)
-                    os.remove(file)
-                    continue
-                if not file_name.lower().endswith("png"):
-                    continue
-                mask_handle = return_mask_handle_from_dot_report(file,
-                                                                 size_mm=(applicator_size*10, applicator_size*10))
-                create_rt_mask(reader, monitored_path, mask_handle)
-                os.remove(file)
+        # for folder in os.listdir(dot_decimal_path):
+        #     applicator_size = int(folder.split('x')[0])
+        #     for file_name in os.listdir(os.path.join(dot_decimal_path, folder)):
+        #         file = os.path.join(dot_decimal_path, folder, file_name)
+        #         if file_name.lower().endswith("pdf"):
+        #             create_png(file)
+        #             os.remove(file)
+        #             continue
+        #         if not file_name.lower().endswith("png"):
+        #             continue
+        #         mask_handle = return_mask_handle_from_dot_report(file,
+        #                                                          size_mm=(applicator_size*10, applicator_size*10))
+        #         create_rt_mask(reader, monitored_path, mask_handle)
+        #         os.remove(file)
 
 
 if __name__ == '__main__':
